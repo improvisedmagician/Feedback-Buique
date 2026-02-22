@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Secretaria de Educação</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-slate-50 min-h-screen font-sans text-slate-800 p-4 sm:p-8">
+
+    <div class="max-w-6xl mx-auto">
+        
+        <header class="mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-end border-b border-slate-200 pb-4 gap-4">
+            <div>
+                <span class="text-xs font-black tracking-widest text-red-600 uppercase">Secretaria de Educação</span>
+                <h1 class="text-3xl font-extrabold text-slate-800 mt-1">Painel de Resultados</h1>
+                <p class="text-slate-500 mt-1">Acompanhamento em tempo real das Formações.</p>
+            </div>
+            <button onclick="carregarDados()" id="btnAtualizar" class="bg-white border border-slate-300 text-slate-600 px-5 py-2.5 rounded-xl hover:bg-slate-100 transition-colors shadow-sm flex items-center gap-2 font-bold">
+                🔄 Atualizar Dados
+            </button>
+        </header>
+
+        <div id="loading" class="flex flex-col items-center justify-center py-20">
+            <svg class="animate-spin h-10 w-10 text-red-600 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+            <p class="text-slate-500 font-medium">Buscando dados no Firebase...</p>
+        </div>
+
+        <div id="dashboard-content" class="hidden">
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-6">
+                    <div class="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center text-3xl">📊</div>
+                    <div>
+                        <p class="text-sm text-slate-500 font-bold uppercase tracking-wider">Total de Avaliações</p>
+                        <h2 class="text-4xl font-black text-slate-800" id="total-votos">0</h2>
+                    </div>
+                </div>
+
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-6">
+                    <div class="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center text-3xl">⭐</div>
+                    <div>
+                        <p class="text-sm text-slate-500 font-bold uppercase tracking-wider">Média Geral</p>
+                        <div class="flex items-baseline gap-2">
+                            <h2 class="text-4xl font-black text-slate-800" id="media-geral">0.0</h2>
+                            <span class="text-slate-400 font-medium">/ 4.0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                <div class="bg-white p-6 sm:p-8 rounded-2xl shadow-sm border border-slate-100">
+                    <h3 class="text-lg font-bold text-slate-800 mb-6 text-center">Formação Geral (Distribuição)</h3>
+                    <div class="relative h-64 w-full">
+                        <canvas id="graficoDistribuicao"></canvas>
+                    </div>
+                </div>
+
+                <div class="bg-white p-6 sm:p-8 rounded-2xl shadow-sm border border-slate-100">
+                    <h3 class="text-lg font-bold text-slate-800 mb-6 text-center">Desempenho por Área (Médias)</h3>
+                    <div class="relative h-64 w-full">
+                        <canvas id="graficoMetricas"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white p-6 sm:p-8 rounded-2xl shadow-sm border border-slate-100 mb-10">
+                <h3 class="text-lg font-bold text-slate-800 mb-6 border-b border-slate-100 pb-4">Mural de Comentários</h3>
+                
+                <div id="lista-comentarios" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    </div>
+                
+                <div id="sem-comentarios" class="hidden text-center py-10 text-slate-400 font-medium">
+                    Nenhum comentário por escrito até o momento.
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+        import { getFirestore, collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+
+      
+        const firebaseConfig = {
+  apiKey: "AIzaSyDvokYBY1WNNNCHWECy5nQmSSVPPEFYEAs",
+  authDomain: "frequencia-buique.firebaseapp.com",
+  databaseURL: "https://frequencia-buique-default-rtdb.firebaseio.com",
+  projectId: "frequencia-buique",
+  storageBucket: "frequencia-buique.firebasestorage.app",
+  messagingSenderId: "757500707726",
+  appId: "1:757500707726:web:28445d21ae43b0d61fdadf",
+  
+};
+
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        // ==========================================
+        // LÓGICA DO DASHBOARD
+        // ==========================================
+        const EVENT_ID = 'formacao_educacao_2026';
+        let chartDist = null;
+        let chartMetricas = null;
+
+        window.carregarDados = async function() {
+            const btn = document.getElementById('btnAtualizar');
+            btn.innerHTML = "🔄 Buscando...";
+            
+            document.getElementById('dashboard-content').classList.add('hidden');
+            document.getElementById('loading').classList.remove('hidden');
+
+            try {
+                const q = query(collection(db, "avaliacoes"), where("evento_id", "==", EVENT_ID));
+                const querySnapshot = await getDocs(q);
+
+                let totalVotos = 0;
+                
+                // Variáveis para as 6 métricas
+                let somaGeral = 0, somaPalestra = 0, somaUtilidade = 0, somaAmbiente = 0, somaLanche = 0, somaOficinas = 0;
+                let distGeral = { 1: 0, 2: 0, 3: 0, 4: 0 };
+                let comentariosHTML = "";
+
+                querySnapshot.forEach((doc) => {
+                    const data = doc.data();
+                    totalVotos++;
+                    
+                    // Somando as notas para tirar a média depois
+                    somaGeral += data.nota_geral || 0;
+                    somaPalestra += data.nota_palestra || 0;
+                    somaUtilidade += data.nota_utilidade || 0;
+                    somaAmbiente += data.nota_ambiente || 0;
+                    somaLanche += data.nota_lanche || 0;
+                    somaOficinas += data.nota_oficinas || 0;
+
+                    // Conta quantos votos a "Nota Geral" teve em cada carinha (1 a 4)
+                    if(data.nota_geral) distGeral[data.nota_geral]++;
+
+                    // Processa os textos
+                    const gostou = data.comentario_gostou || "";
+                    const melhorar = data.comentario_melhorar || "";
+                    
+                    if (gostou.trim() !== "" || melhorar.trim() !== "") {
+                        let cardContent = `<div class="bg-slate-50 p-5 rounded-xl border border-slate-200 text-sm shadow-sm hover:shadow-md transition-shadow">`;
+                        
+                        if (gostou.trim() !== "") {
+                            cardContent += `<div class="mb-3"><span class="font-bold text-green-600 block mb-1">👍 O que mais gostou:</span> <span class="text-slate-700 italic">"${gostou}"</span></div>`;
+                        }
+                        if (melhorar.trim() !== "") {
+                            cardContent += `<div><span class="font-bold text-orange-500 block mb-1">💡 O que melhorar:</span> <span class="text-slate-700 italic">"${melhorar}"</span></div>`;
+                        }
+                        
+                        cardContent += `</div>`;
+                        comentariosHTML += cardContent;
+                    }
+                });
+
+                // Renderiza os dados na tela se houver votos
+                if (totalVotos > 0) {
+                    document.getElementById('total-votos').innerText = totalVotos;
+                    document.getElementById('media-geral').innerText = (somaGeral / totalVotos).toFixed(1);
+                    
+                    renderizarGraficoDistribuicao(distGeral);
+                    
+                    // Médias específicas para o Gráfico de Barras
+                    const mediasAreas = [
+                        (somaPalestra / totalVotos).toFixed(1),
+                        (somaUtilidade / totalVotos).toFixed(1),
+                        (somaOficinas / totalVotos).toFixed(1),
+                        (somaAmbiente / totalVotos).toFixed(1),
+                        (somaLanche / totalVotos).toFixed(1)
+                    ];
+                    renderizarGraficoMetricas(mediasAreas);
+
+                    const listaComentarios = document.getElementById('lista-comentarios');
+                    if (comentariosHTML !== "") {
+                        listaComentarios.innerHTML = comentariosHTML;
+                        document.getElementById('sem-comentarios').classList.add('hidden');
+                        listaComentarios.classList.remove('hidden');
+                    } else {
+                        listaComentarios.classList.add('hidden');
+                        document.getElementById('sem-comentarios').classList.remove('hidden');
+                    }
+                } else {
+                    alert("Ainda não há avaliações registradas para esta formação.");
+                }
+
+                document.getElementById('loading').classList.add('hidden');
+                document.getElementById('dashboard-content').classList.remove('hidden');
+
+            } catch (error) {
+                console.error("Erro ao buscar dados: ", error);
+                alert("Erro ao conectar com o banco de dados. Verifique suas chaves do Firebase.");
+                document.getElementById('loading').classList.add('hidden');
+            }
+            
+            btn.innerHTML = "🔄 Atualizar Dados";
+        }
+
+        // ==========================================
+        // CONFIGURAÇÃO DO CHART.JS
+        // ==========================================
+        function renderizarGraficoDistribuicao(dist) {
+            const ctx = document.getElementById('graficoDistribuicao').getContext('2d');
+            if (chartDist) chartDist.destroy();
+
+            chartDist = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['🙁 Ruim', '😐 Regular', '🙂 Boa', '😍 Ótima'],
+                    datasets: [{
+                        label: 'Qtd de Votos',
+                        data: [dist[1], dist[2], dist[3], dist[4]],
+                        backgroundColor: ['#f87171', '#fbbf24', '#60a5fa', '#34d399'],
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+                }
+            });
+        }
+
+        function renderizarGraficoMetricas(medias) {
+            const ctx = document.getElementById('graficoMetricas').getContext('2d');
+            if (chartMetricas) chartMetricas.destroy();
+
+            chartMetricas = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Palestra/Dinâmica', 'Utilidade Prática', 'Oficinas', 'Ambiente', 'Lanche'],
+                    datasets: [{
+                        label: 'Nota Média',
+                        data: medias,
+                        backgroundColor: '#dc2626', // Red-600 do Tailwind
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    indexAxis: 'y', // Deixa as barras horizontais
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { x: { min: 0, max: 4 } }
+                }
+            });
+        }
+
+        // Executa a busca assim que a página é carregada
+        window.onload = carregarDados;
+    </script>
+</body>
+</html>
