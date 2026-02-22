@@ -202,17 +202,17 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
         import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
-        // ==========================================
-        // ⚠️ COLE SUAS CHAVES DO FIREBASE AQUI! ⚠️
-        // ==========================================
+    
         const firebaseConfig = {
-            apiKey: "SUA_API_KEY",
-            authDomain: "SEU_PROJETO.firebaseapp.com",
-            projectId: "SEU_PROJETO",
-            storageBucket: "SEU_PROJETO.appspot.com",
-            messagingSenderId: "SEU_ID",
-            appId: "SEU_APP_ID"
-        };
+  apiKey: "AIzaSyDvokYBY1WNNNCHWECy5nQmSSVPPEFYEAs",
+  authDomain: "frequencia-buique.firebaseapp.com",
+  databaseURL: "https://frequencia-buique-default-rtdb.firebaseio.com",
+  projectId: "frequencia-buique",
+  storageBucket: "frequencia-buique.firebasestorage.app",
+  messagingSenderId: "757500707726",
+  appId: "1:757500707726:web:28445d21ae43b0d61fdadf",
+  
+};
 
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
